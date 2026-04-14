@@ -1,0 +1,148 @@
+C51 COMPILER V9.60.7.0   MAIN                                                              04/06/2026 16:02:03 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"
+   3          #include "i2c.h"
+   4          
+   5          unsigned int dig_T1;
+   6          int dig_T2, dig_T3;
+   7          
+   8          #define BMP280_ADDR 0x76
+   9          
+  10          // Fast sequential read for calibration data
+  11          void read_calibration()
+  12          {
+  13   1          unsigned char lsb, msb;
+  14   1      
+  15   1          I2C_Start();
+  16   1          I2C_Write((BMP280_ADDR << 1) | 0); // Write mode
+  17   1          I2C_Write(0x88);                   // Start at dig_T1 LSB
+  18   1      
+  19   1          I2C_Start(); // Repeated start
+  20   1          I2C_Write((BMP280_ADDR << 1) | 1); // Read mode
+  21   1      
+  22   1          I2C_Ack(); lsb = I2C_Read();
+  23   1          I2C_Ack(); msb = I2C_Read();
+  24   1          dig_T1 = (msb << 8) | lsb;
+  25   1      
+  26   1          I2C_Ack(); lsb = I2C_Read();
+  27   1          I2C_Ack(); msb = I2C_Read();
+  28   1          dig_T2 = (msb << 8) | lsb;
+  29   1      
+  30   1          I2C_Ack();  lsb = I2C_Read();
+  31   1          I2C_Nack(); msb = I2C_Read(); // NACK on the final byte
+  32   1          dig_T3 = (msb << 8) | lsb;
+  33   1      
+  34   1          I2C_Stop();
+  35   1      }
+  36          
+  37          // Fast sequential read for temperature registers
+  38          long read_raw_temp()
+  39          {
+  40   1          unsigned char msb, lsb, xlsb;
+  41   1          long adc_T;
+  42   1      
+  43   1          I2C_Start();
+  44   1          I2C_Write((BMP280_ADDR << 1) | 0); // Write mode
+  45   1          I2C_Write(0xFA);                   // Start at temp MSB
+  46   1      
+  47   1          I2C_Start(); // Repeated start
+  48   1          I2C_Write((BMP280_ADDR << 1) | 1); // Read mode
+  49   1      
+  50   1          I2C_Ack();  msb = I2C_Read();
+  51   1          I2C_Ack();  lsb = I2C_Read();
+  52   1          I2C_Nack(); xlsb = I2C_Read(); // NACK on the final byte
+  53   1      
+  54   1          I2C_Stop();
+C51 COMPILER V9.60.7.0   MAIN                                                              04/06/2026 16:02:03 PAGE 2   
+
+  55   1      
+  56   1          adc_T = ((long)msb << 12) | ((long)lsb << 4) | (xlsb >> 4);
+  57   1          return adc_T;
+  58   1      }
+  59          
+  60          // Bosch Compensation Algorithm
+  61          int compensate_temp(long adc_T)
+  62          {
+  63   1          long var1, var2, t_fine;
+  64   1          int T;
+  65   1      
+  66   1          var1 = ((((adc_T >> 3) - ((long)dig_T1 << 1))) * ((long)dig_T2)) >> 11;
+  67   1      
+  68   1          var2 = (((((adc_T >> 4) - ((long)dig_T1)) *
+  69   1                    ((adc_T >> 4) - ((long)dig_T1))) >> 12) *
+  70   1                    ((long)dig_T3)) >> 14;
+  71   1      
+  72   1          t_fine = var1 + var2;
+  73   1          T = (t_fine * 5 + 128) >> 8;
+  74   1      
+  75   1          return T;  // temp * 100
+  76   1      }
+  77          
+  78          void main()
+  79          {
+  80   1          long adc_T;
+  81   1          int T;
+  82   1          int temp_int, temp_frac;
+  83   1      
+  84   1          lcd_init();
+  85   1      
+  86   1          SSCON = 0x44;   // Enable I2C Hardware
+  87   1          msdelay(100);
+  88   1      
+  89   1          // Wake sensor & configure (1x Oversampling, Normal Mode)
+  90   1          I2C_WriteByte(BMP280_ADDR, 0xF4, 0x27);
+  91   1          msdelay(100);
+  92   1      
+  93   1          // Read calibration constants once
+  94   1          read_calibration();
+  95   1      
+  96   1          while(1)
+  97   1          {
+  98   2              adc_T = read_raw_temp();
+  99   2              T = compensate_temp(adc_T);
+ 100   2      
+ 101   2              temp_int = T / 100;
+ 102   2              temp_frac = T % 100;
+ 103   2      
+ 104   2              lcd_cmd(0x80);
+ 105   2              lcd_write_string("Temp:");
+ 106   2      
+ 107   2              lcd_cmd(0xC0);
+ 108   2              lcd_print_int(temp_int);
+ 109   2              
+ 110   2              // Print fractional part safely
+ 111   2              lcd_write_char('.');
+ 112   2              if (temp_frac < 10) {
+ 113   3                  lcd_write_char('0'); // Add leading zero if needed
+ 114   3              }
+ 115   2              lcd_print_int(temp_frac);
+ 116   2              lcd_write_string(" C");
+C51 COMPILER V9.60.7.0   MAIN                                                              04/06/2026 16:02:03 PAGE 3   
+
+ 117   2      
+ 118   2              msdelay(500);
+ 119   2          }
+ 120   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    961    ----
+   CONSTANT SIZE    =      9    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      6      37
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
