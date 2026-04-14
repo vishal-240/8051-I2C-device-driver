@@ -1,0 +1,153 @@
+C51 COMPILER V9.60.7.0   PHASE1                                                            03/30/2026 14:44:03 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE PHASE1
+OBJECT MODULE PLACED IN .\Objects\phase1.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE phase1.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\ph
+                    -ase1.lst) TABS(2) OBJECT(.\Objects\phase1.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"
+   3          
+   4          // Control bits
+   5          #define SI  0x08 //bit 3: SI flag
+   6          #define STA 0x20 //bit 5: Start condition
+   7          #define STO 0x10 //bit 4: Stop condition
+   8          #define AA  0x04 //bit 2: Acknowledge enable
+   9          
+  10          #define BMP280_ADDR 0x76 // I2C address of BMP280 if SDO is gnd
+  11          
+  12          void lcd_print_hex(unsigned char val)
+  13          {
+  14   1          unsigned char high, low;
+  15   1      
+  16   1          high = (val >> 4) & 0x0F;
+  17   1          low = val & 0x0F;
+  18   1      
+  19   1          high += (high < 10) ? '0' : 'A' - 10;
+  20   1          low += (low < 10) ? '0' : 'A' - 10;
+  21   1      
+  22   1          lcd_write_char(high);
+  23   1          lcd_write_char(low);
+  24   1      }
+  25          
+  26          void I2C_Wait() {
+  27   1          while(!(SSCON & SI));   // wait for completion
+  28   1      }
+  29          
+  30          void I2C_Check(unsigned char expected) { //Checking the status code against expected value
+  31   1          unsigned char status = SSCS;
+  32   1      
+  33   1          if(status != expected) {
+  34   2              lcd_cmd(0x01);
+  35   2              lcd_write_string("ERR:");
+  36   2              lcd_print_hex(status);
+  37   2              while(1);
+  38   2          }
+  39   1      }
+  40          
+  41          void I2C_Start(unsigned char expected_status) {
+  42   1          SSCON |= STA;
+  43   1          SSCON &= ~SI;
+  44   1      
+  45   1          I2C_Wait();
+  46   1          I2C_Check(expected_status);
+  47   1      
+  48   1          SSCON &= ~STA;
+  49   1      }
+  50          
+  51          void I2C_Stop() {
+  52   1          SSCON |= STO;
+  53   1          SSCON &= ~SI;
+  54   1          
+C51 COMPILER V9.60.7.0   PHASE1                                                            03/30/2026 14:44:03 PAGE 2   
+
+  55   1          while(SSCON & STO); //since the STOP condition is automatically cleared
+  56   1      }
+  57          
+  58          void I2C_Write(unsigned char tx_data, unsigned char expected_status) {
+  59   1          SSDAT = tx_data;
+  60   1          SSCON &= ~SI;
+  61   1      
+  62   1          I2C_Wait();
+  63   1          I2C_Check(expected_status);
+  64   1      }
+  65          
+  66          unsigned char I2C_Read(unsigned char ack, unsigned char expected_status) {
+  67   1          if(ack)
+  68   1              SSCON |= AA;
+  69   1          else
+  70   1              SSCON &= ~AA;
+  71   1      
+  72   1          SSCON &= ~SI;
+  73   1      
+  74   1          I2C_Wait();
+  75   1          I2C_Check(expected_status);
+  76   1      
+  77   1          return SSDAT;
+  78   1      }
+  79          
+  80          unsigned char BMP280_ReadID() {
+  81   1          unsigned char id;
+  82   1      
+  83   1          I2C_Start(0x08); // start 
+  84   1      
+  85   1          // SLAVE Addr + WRITE → expect ACK (0x18)
+  86   1          I2C_Write((BMP280_ADDR << 1) | 0, 0x18);
+  87   1      
+  88   1          // Register address → expect ACK (0x28)
+  89   1          I2C_Write(0xD0, 0x28);
+  90   1      
+  91   1          I2C_Start(0x10); // repeated start
+  92   1      
+  93   1          // SLAVE Addr + READ → expect ACK (0x40)
+  94   1          I2C_Write((BMP280_ADDR << 1) | 1, 0x40);
+  95   1      
+  96   1          // READ DATA → expect (0x58 = data received, NACK returned)
+  97   1          id = I2C_Read(0, 0x58);
+  98   1      
+  99   1          I2C_Stop();
+ 100   1      
+ 101   1          return id;
+ 102   1      }
+ 103          
+ 104          void main()
+ 105          {
+ 106   1          unsigned char chip_id;
+ 107   1      
+ 108   1          lcd_init();
+ 109   1      
+ 110   1          // Enable TWI
+ 111   1          SSCON = 0x44;
+ 112   1      
+ 113   1          msdelay(100);
+ 114   1      
+ 115   1          chip_id = BMP280_ReadID();
+ 116   1      
+C51 COMPILER V9.60.7.0   PHASE1                                                            03/30/2026 14:44:03 PAGE 3   
+
+ 117   1          lcd_cmd(0x80);
+ 118   1          lcd_write_string("BMP280 ID:");
+ 119   1      
+ 120   1          lcd_cmd(0xC0);
+ 121   1          lcd_write_string("0x");
+ 122   1          lcd_print_hex(chip_id);
+ 123   1      
+ 124   1          while (1);
+ 125   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    418    ----
+   CONSTANT SIZE    =     19    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       5
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
