@@ -1,0 +1,5 @@
+".\Objects\STARTUP.obj",
+".\Objects\main.obj",
+".\Objects\i2c.obj" 
+TO ".\Objects\Phase3" 
+PRINT(".\Listings\Phase3.m51") RAMSIZE(256) 

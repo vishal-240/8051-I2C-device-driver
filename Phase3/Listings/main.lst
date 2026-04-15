@@ -1,0 +1,207 @@
+C51 COMPILER V9.60.7.0   MAIN                                                              04/15/2026 14:39:58 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"
+   3          #include "i2c.h"
+   4          #include "serial.h"
+   5          
+   6          unsigned int dig_T1;
+   7          int dig_T2, dig_T3;
+   8          
+   9          int bcd_to_dec(unsigned char val) // Convert BCD to Decimal
+  10          {
+  11   1          return ((val >> 4) * 10) + (val & 0x0F);
+  12   1      }
+  13          
+  14          unsigned char dec_to_bcd(int val)
+  15          {
+  16   1          return ((val / 10) << 4) | (val % 10);
+  17   1      }
+  18          
+  19          void uart_print_2digit(int num)
+  20          {
+  21   1          transmit_char((num / 10) + '0');
+  22   1          transmit_char((num % 10) + '0');
+  23   1      }
+  24          
+  25          void lcd_print_2digit(int num)
+  26          {
+  27   1          lcd_write_char((num / 10) + '0');
+  28   1          lcd_write_char((num % 10) + '0');
+  29   1      }
+  30          
+  31          int get_temp_in_C(long raw_T)
+  32          {
+  33   1          long var1, var2, t_fine;
+  34   1          int T;
+  35   1      
+  36   1          var1 = ((((raw_T >> 3) - ((long)dig_T1 << 1))) * ((long)dig_T2)) >> 11;
+  37   1      
+  38   1          var2 = (((((raw_T >> 4) - ((long)dig_T1)) *
+  39   1                    ((raw_T >> 4) - ((long)dig_T1))) >>
+  40   1                   12) *
+  41   1                  ((long)dig_T3)) >>
+  42   1                 14;
+  43   1      
+  44   1          t_fine = var1 + var2;
+  45   1      
+  46   1          T = (t_fine * 5 + 128) >> 8;
+  47   1      
+  48   1          return T; // temperature × 100
+  49   1      }
+  50          
+  51          void get_real_time(int *hh, int *mm, int *ss)
+  52          {
+  53   1          char h1, h2, m1, m2, s1, s2, temp;
+  54   1      
+C51 COMPILER V9.60.7.0   MAIN                                                              04/15/2026 14:39:58 PAGE 2   
+
+  55   1          transmit_string("Enter time (HH:MM:SS): ");
+  56   1      
+  57   1          h1 = receive_char();
+  58   1          h2 = receive_char();
+  59   1          temp = receive_char(); // skip ':'
+  60   1      
+  61   1          m1 = receive_char();
+  62   1          m2 = receive_char();
+  63   1          temp = receive_char(); // skip ':'
+  64   1      
+  65   1          s1 = receive_char();
+  66   1          s2 = receive_char();
+  67   1      
+  68   1          transmit_string("\r\n");
+  69   1      
+  70   1          // ASCII → integer
+  71   1          *hh = (h1 - '0') * 10 + (h2 - '0');
+  72   1          *mm = (m1 - '0') * 10 + (m2 - '0');
+  73   1          *ss = (s1 - '0') * 10 + (s2 - '0');
+  74   1      }
+  75          
+  76          void set_rtc_time(int hh, int mm, int ss)
+  77          {
+  78   1          unsigned char bcd_sec, bcd_min, bcd_hour;
+  79   1      
+  80   1          bcd_sec  = dec_to_bcd(ss) & 0x7F; // clear CH bit
+  81   1          bcd_min  = dec_to_bcd(mm);
+  82   1          bcd_hour = dec_to_bcd(hh);
+  83   1      
+  84   1          I2C_WriteByte(0x68, 0x00, bcd_sec);
+  85   1          I2C_WriteByte(0x68, 0x01, bcd_min);
+  86   1          I2C_WriteByte(0x68, 0x02, bcd_hour);
+  87   1      }
+  88          
+  89          void main()
+  90          {
+  91   1          unsigned char sec_bcd, min_bcd, hour_bcd;
+  92   1          int sec, min, hour;
+  93   1          unsigned char msb, lsb, xlsb;
+  94   1          long raw_T;
+  95   1          int temp_C;
+  96   1          int hh, mm, ss;
+  97   1      
+  98   1          lcd_init();
+  99   1          uart_init();
+ 100   1      
+ 101   1          SSCON = 0x44; // Enable I2C
+ 102   1          msdelay(200); // RTC power-up delay
+ 103   1      
+ 104   1          I2C_WriteByte(0x76, 0xF4, 0x27); // waking up the sensor
+ 105   1          msdelay(100);
+ 106   1      
+ 107   1          dig_T1 = (I2C_ReadByte(0x76, 0x89) << 8) | I2C_ReadByte(0x76, 0x88);
+ 108   1          dig_T2 = (I2C_ReadByte(0x76, 0x8B) << 8) | I2C_ReadByte(0x76, 0x8A);
+ 109   1          dig_T3 = (I2C_ReadByte(0x76, 0x8D) << 8) | I2C_ReadByte(0x76, 0x8C);
+ 110   1        
+ 111   1          // Get time from user
+ 112   1          get_real_time(&hh, &mm, &ss);
+ 113   1          
+ 114   1          // Set RTC
+ 115   1          set_rtc_time(hh, mm, ss);
+ 116   1      
+C51 COMPILER V9.60.7.0   MAIN                                                              04/15/2026 14:39:58 PAGE 3   
+
+ 117   1          //I2C_WriteByte(0x68, 0x00, 0x00); // Clears CH bit to start RTC
+ 118   1      
+ 119   1          while (1)
+ 120   1          {
+ 121   2              // Read raw temperature data from BMP280
+ 122   2              msb = I2C_ReadByte(0x76, 0xFA);
+ 123   2              lsb = I2C_ReadByte(0x76, 0xFB);
+ 124   2              xlsb = I2C_ReadByte(0x76, 0xFC);
+ 125   2      
+ 126   2              raw_T = ((long)msb << 12) | ((long)lsb << 4) | (xlsb >> 4);
+ 127   2              temp_C = get_temp_in_C(raw_T);
+ 128   2      
+ 129   2              // Read time data from RTC
+ 130   2              sec_bcd = I2C_ReadByte(0x68, 0x00);
+ 131   2              min_bcd = I2C_ReadByte(0x68, 0x01);
+ 132   2              hour_bcd = I2C_ReadByte(0x68, 0x02);
+ 133   2      
+ 134   2              // Mask unwanted bits
+ 135   2              sec_bcd &= 0x7F;  // clear CH bit
+ 136   2              hour_bcd &= 0x3F; // 24-hour mode safe mask
+ 137   2      
+ 138   2              // Convert BCD to Decimal
+ 139   2              sec = bcd_to_dec(sec_bcd);
+ 140   2              min = bcd_to_dec(min_bcd);
+ 141   2              hour = bcd_to_dec(hour_bcd);
+ 142   2      
+ 143   2              // Display time on LCD
+ 144   2              lcd_cmd(0x80);
+ 145   2              lcd_write_string("Time: ");
+ 146   2              lcd_print_2digit(hour);
+ 147   2              lcd_write_char(':');
+ 148   2              lcd_print_2digit(min);
+ 149   2              lcd_write_char(':');
+ 150   2              lcd_print_2digit(sec);
+ 151   2      
+ 152   2              lcd_cmd(0xC0);
+ 153   2              lcd_write_string("Temp: ");
+ 154   2              lcd_print_2digit(temp_C / 100); // Integer part
+ 155   2              lcd_write_char('.');
+ 156   2              lcd_print_2digit(temp_C % 100); // Fractional part
+ 157   2              lcd_write_string(" C");
+ 158   2      
+ 159   2              // Display time on PC via UART
+ 160   2              transmit_string("Time: ");
+ 161   2              uart_print_2digit(hour);
+ 162   2              transmit_char(':');
+ 163   2              uart_print_2digit(min);
+ 164   2              transmit_char(':');
+ 165   2              uart_print_2digit(sec);
+ 166   2              transmit_string("\r\n");
+ 167   2      
+ 168   2              // Display temperature on PC via UART
+ 169   2              transmit_string("Temp: ");
+ 170   2              uart_print_2digit(temp_C / 100);
+ 171   2              transmit_char('.');
+ 172   2              uart_print_2digit(temp_C % 100);
+ 173   2              transmit_string(" C\r\n");
+ 174   2      
+ 175   2              msdelay(1000); // Updates every second
+ 176   2          }
+ 177   1      }
+
+C51 COMPILER V9.60.7.0   MAIN                                                              04/15/2026 14:39:58 PAGE 4   
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1532    ----
+   CONSTANT SIZE    =     49    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      6      68
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
