@@ -1,0 +1,144 @@
+C51 COMPILER V9.60.7.0   3DEBUG                                                            04/14/2026 23:12:25 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE 3DEBUG
+OBJECT MODULE PLACED IN .\Objects\3debug.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE 3debug.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\3d
+                    -ebug.lst) TABS(2) OBJECT(.\Objects\3debug.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "lcd.h"
+   3          #include "i2c.h"
+   4          #include "serial.h"
+   5          
+   6          // ---------- DEBUG PRINT ----------
+   7          void debug_msg(char *msg)
+   8          {
+   9   1          lcd_cmd(0x01);          // clear screen
+  10   1          lcd_write_string(msg);
+  11   1          msdelay(1000);
+  12   1      }
+  13          
+  14          // ---------- PRINT HEX ----------
+  15          void lcd_print_hex(unsigned char val)
+  16          {
+  17   1          unsigned char high = (val >> 4) & 0x0F;
+  18   1          unsigned char low  = val & 0x0F;
+  19   1      
+  20   1          high += (high < 10) ? '0' : 'A' - 10;
+  21   1          low  += (low  < 10) ? '0' : 'A' - 10;
+  22   1      
+  23   1          lcd_write_char(high);
+  24   1          lcd_write_char(low);
+  25   1      }
+  26          
+  27          // ---------- SHOW STATUS ----------
+  28          void show_status()
+  29          {
+  30   1          lcd_cmd(0x01);
+  31   1          lcd_write_string("SSCS:");
+  32   1          lcd_print_hex(SSCS);
+  33   1          while(1);   // freeze here
+  34   1      }
+  35          
+  36          // ---------- SAFE READ ----------
+  37          unsigned char safe_read(unsigned char dev, unsigned char reg)
+  38          {
+  39   1          unsigned char val;
+  40   1      
+  41   1          I2C_Start();
+  42   1      
+  43   1          I2C_Write((dev << 1) | 0);
+  44   1          if(SSCS != 0x18) show_status();
+  45   1      
+  46   1          I2C_Write(reg);
+  47   1          if(SSCS != 0x28) show_status();
+  48   1      
+  49   1          I2C_Start();
+  50   1          if(SSCS != 0x10) show_status();
+  51   1      
+  52   1          I2C_Write((dev << 1) | 1);
+  53   1          if(SSCS != 0x40) show_status();
+  54   1      
+C51 COMPILER V9.60.7.0   3DEBUG                                                            04/14/2026 23:12:25 PAGE 2   
+
+  55   1          I2C_Nack();
+  56   1          val = I2C_Read();
+  57   1      
+  58   1          if(SSCS != 0x58) show_status();
+  59   1      
+  60   1          I2C_Stop();
+  61   1      
+  62   1          return val;
+  63   1      }
+  64          
+  65          // ---------- MAIN ----------
+  66          void main()
+  67          {
+  68   1          unsigned char val;
+  69   1      
+  70   1          lcd_init();
+  71   1          uart_init();
+  72   1      
+  73   1          debug_msg("START");
+  74   1      
+  75   1          SSCON = 0x44;
+  76   1          msdelay(200);
+  77   1      
+  78   1          debug_msg("I2C OK");
+  79   1      
+  80   1          // ---------- BMP TEST ----------
+  81   1          debug_msg("BMP WAKE");
+  82   1      
+  83   1          I2C_WriteByte(0x76, 0xF4, 0x27);
+  84   1          msdelay(100);
+  85   1      
+  86   1          debug_msg("BMP READ");
+  87   1      
+  88   1          val = safe_read(0x76, 0xD0);   // read ID
+  89   1      
+  90   1          lcd_cmd(0x01);
+  91   1          lcd_write_string("BMP ID:");
+  92   1          lcd_print_hex(val);
+  93   1          msdelay(2000);
+  94   1      
+  95   1          // ---------- RTC TEST ----------
+  96   1          debug_msg("RTC INIT");
+  97   1      
+  98   1          I2C_WriteByte(0x68, 0x00, 0x00);
+  99   1      
+ 100   1          debug_msg("RTC READ");
+ 101   1      
+ 102   1          val = safe_read(0x68, 0x00);   // read seconds
+ 103   1      
+ 104   1          lcd_cmd(0x01);
+ 105   1          lcd_write_string("SEC:");
+ 106   1          lcd_print_hex(val);
+ 107   1          msdelay(2000);
+ 108   1      
+ 109   1          // ---------- LOOP ----------
+ 110   1          while(1)
+ 111   1          {
+ 112   2              lcd_cmd(0x01);
+ 113   2              lcd_write_string("RUNNING");
+ 114   2              msdelay(1000);
+ 115   2          }
+ 116   1      }
+C51 COMPILER V9.60.7.0   3DEBUG                                                            04/14/2026 23:12:25 PAGE 3   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    617    ----
+   CONSTANT SIZE    =     76    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      13
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

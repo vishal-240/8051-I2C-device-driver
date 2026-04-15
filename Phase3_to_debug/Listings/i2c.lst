@@ -1,0 +1,109 @@
+C51 COMPILER V9.60.7.0   I2C                                                               04/14/2026 23:12:26 PAGE 1   
+
+
+C51 COMPILER V9.60.7.0, COMPILATION OF MODULE I2C
+OBJECT MODULE PLACED IN .\Objects\i2c.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE ..\Phase2\i2c.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\List
+                    -ings\i2c.lst) TABS(2) OBJECT(.\Objects\i2c.obj)
+
+line level    source
+
+   1          #include <at89c5131.h>
+   2          #include "i2c.h"
+   3          
+   4          // Control bits
+   5          #define SI  0x08 //bit 3: SI flag
+   6          #define STA 0x20 //bit 5: Start condition
+   7          #define STO 0x10 //bit 4: Stop condition
+   8          #define AA  0x04 //bit 2: Acknowledge enable
+   9          
+  10          static void I2C_Wait() {
+  11   1          while(!(SSCON & SI));   // wait for completion
+  12   1      }
+  13          
+  14          void I2C_Start() {
+  15   1          SSCON |= STA;
+  16   1          SSCON &= ~SI;
+  17   1      
+  18   1          I2C_Wait();
+  19   1          SSCON &= ~STA;
+  20   1      }
+  21          
+  22          void I2C_Stop() {
+  23   1          SSCON |= STO;
+  24   1          SSCON &= ~SI;
+  25   1              
+  26   1          while(SSCON & STO); //since the STOP condition is automatically cleared
+  27   1      }
+  28          
+  29          void I2C_Write(unsigned char write_data) {
+  30   1          SSDAT = write_data;
+  31   1          SSCON &= ~SI;
+  32   1      
+  33   1          I2C_Wait();
+  34   1      }
+  35          
+  36          unsigned char I2C_Read() {
+  37   1          SSCON &= ~SI;
+  38   1      
+  39   1          I2C_Wait();
+  40   1      
+  41   1          return SSDAT;
+  42   1      }
+  43          
+  44          void I2C_Ack() {
+  45   1          SSCON |= AA;
+  46   1      }
+  47          
+  48          void I2C_Nack() {
+  49   1          SSCON &= ~AA;
+  50   1      }
+  51          
+  52          unsigned char I2C_ReadByte(unsigned char device_addr, unsigned char reg_addr) { //for reading just one byt
+             -e from the device
+  53   1          unsigned char read_data;
+C51 COMPILER V9.60.7.0   I2C                                                               04/14/2026 23:12:26 PAGE 2   
+
+  54   1      
+  55   1          I2C_Start();
+  56   1      
+  57   1          I2C_Write((device_addr << 1) | 0); // Write mode
+  58   1          I2C_Write(reg_addr);
+  59   1      
+  60   1          I2C_Start(); // Repeated start
+  61   1      
+  62   1          I2C_Write((device_addr << 1) | 1); // Read mode
+  63   1      
+  64   1          I2C_Nack(); // NACK before reading the byte
+  65   1          read_data = I2C_Read();
+  66   1      
+  67   1          I2C_Stop();
+  68   1      
+  69   1          return read_data;
+  70   1      }
+  71          
+  72          void I2C_WriteByte(unsigned char device_addr, unsigned char reg_addr, unsigned char write_data) { //for wr
+             -iting just one byte to the device
+  73   1          I2C_Start();
+  74   1      
+  75   1          I2C_Write((device_addr << 1) | 0); // Write mode
+  76   1          I2C_Write(reg_addr);
+  77   1          I2C_Write(write_data);
+  78   1      
+  79   1          I2C_Stop();
+  80   1      }
+  81          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    109    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

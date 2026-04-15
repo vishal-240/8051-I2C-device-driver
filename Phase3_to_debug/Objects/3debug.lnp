@@ -1,0 +1,5 @@
+".\Objects\STARTUP.obj",
+".\Objects\3debug.obj",
+".\Objects\i2c.obj" 
+TO ".\Objects\3debug" 
+PRINT(".\Listings\3debug.m51") RAMSIZE(256) 
