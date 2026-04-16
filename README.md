@@ -4,6 +4,7 @@ Bare-metal I2C driver development on AT89C5131 (8051) with BMP280 sensor and DS1
 **EE337 course project**. 
 
 It was done in 3 phases/weeks:
+
 **Phase 1** - Bare metal code without bit banging for accessing/reading the WhoamI register of the BMP280 sensor.
 
 **Phase 2** - Writing the code in a I2C driver library format for easy access. 
