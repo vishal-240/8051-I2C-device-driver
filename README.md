@@ -9,4 +9,4 @@ It was done in 3 phases/weeks:
 
 **Phase 2** - Writing the code in a I2C driver library format for easy access. 
 
-**Phase 3** - Using my own I2C driver library to interface an RTC(Real-Time Clock) module,DS1307, with the 8051 microcontroller. We use it to print the time and temperature data onto the LCD and also the PC using UART.
+**Phase 3** - Using my own I2C driver library to interface an RTC(Real-Time Clock) module,DS1307, with the 8051 microcontroller. We use it to print the time and temperature data from BMP280 onto the LCD and also the PC using UART.
